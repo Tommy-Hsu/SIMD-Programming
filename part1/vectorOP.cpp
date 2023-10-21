@@ -114,9 +114,28 @@ float arraySumVector(float *values, int N)
   // PP STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
 
+  float sum = 0.f;
+
   for (int i = 0; i < N; i += VECTOR_WIDTH)
   {
+      __pp_vec_float x;
+      __pp_vec_float result;
+      __pp_mask      maskAll;
+
+      // All ones
+      maskAll = _pp_init_ones();
+
+      // Load vector of values from contiguous memory addresses
+      _pp_vload_float(x, values + i, maskAll); // x = values[i];
+
+      _pp_hadd_float(result, x); // result = (a+b) | (a+b) | (c+d) | (c+d)
+
+      _pp_interleave_float(result, result); // result = (a+b) | (c+d) | (a+b) | (c+d)
+
+      _pp_hadd_float(result, result); // result = (a+b+c+d) | (a+b+c+d) | (a+b+c+d) | (a+b+c+d)
+
+      sum += result.value[0];
   }
 
-  return 0.0;
+  return sum;
 }
