@@ -49,22 +49,23 @@ void clampedExpVector(float *values, int *exponents, float *output, int N)
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  __pp_vec_float x;      // base
+  __pp_vec_int   y;      // exp
+  __pp_vec_float result; // result
+  __pp_vec_int   count;  // count
+  __pp_vec_int   zero = _pp_vset_int(0);
+  __pp_vec_int   one  = _pp_vset_int(1);
+  __pp_vec_float nine = _pp_vset_float(9.999999f);
+  __pp_mask      maskAll, maskIsZero, maskIsNotZero, maskForWhile;
+
+  // All ones
+  maskAll = _pp_init_ones();
+
+  // All zeros
+  maskIsZero = _pp_init_ones(0);
+
   for (int i = 0; i < N; i += VECTOR_WIDTH)
   {
-      __pp_vec_float x;      // base
-      __pp_vec_int   y;      // exp
-      __pp_vec_float result; // result
-      __pp_vec_int   count;  // count
-      __pp_vec_int   zero = _pp_vset_int(0);
-      __pp_vec_int   one  = _pp_vset_int(1);
-      __pp_vec_float nine = _pp_vset_float(9.999999f);
-      __pp_mask      maskAll, maskIsZero, maskIsNotZero, maskForWhile;
-
-      // All ones
-      maskAll = _pp_init_ones();
-
-      // All zeros
-      maskIsZero = _pp_init_ones(0);
 
       // Load vector of values and vector of exponents from contiguous memory addresses
       _pp_vload_float(x, values + i, maskAll); // x = values[i];
@@ -115,26 +116,28 @@ float arraySumVector(float *values, int N)
   //
 
   float sum = 0.f;
+  __pp_vec_float x;
+  __pp_vec_float temp;
+  __pp_mask      maskAll;
+
+      // All ones
+  maskAll = _pp_init_ones();
 
   for (int i = 0; i < N; i += VECTOR_WIDTH)
   {
-      __pp_vec_float x;
-      __pp_vec_float result;
-      __pp_mask      maskAll;
-
-      // All ones
-      maskAll = _pp_init_ones();
-
       // Load vector of values from contiguous memory addresses
       _pp_vload_float(x, values + i, maskAll); // x = values[i];
 
-      _pp_hadd_float(result, x); // result = (a+b) | (a+b) | (c+d) | (c+d)
+      for (int j = 2; j < VECTOR_WIDTH; j = j*2){
+  
+        _pp_hadd_float(temp, x); // result = (a+b) | (a+b) | (c+d) | (c+d)
 
-      _pp_interleave_float(result, result); // result = (a+b) | (c+d) | (a+b) | (c+d)
+        _pp_interleave_float(x, temp); // result = (a+b) | (c+d) | (a+b) | (c+d)
+   
+      }
+      _pp_hadd_float(x, x); // result = (a+b+c+d) | (a+b+c+d) | (a+b+c+d) | (a+b+c+d)
 
-      _pp_hadd_float(result, result); // result = (a+b+c+d) | (a+b+c+d) | (a+b+c+d) | (a+b+c+d)
-
-      sum += result.value[0];
+      sum += x.value[0];
   }
 
   return sum;
