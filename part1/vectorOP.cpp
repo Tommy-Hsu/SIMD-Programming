@@ -49,41 +49,39 @@ void clampedExpVector(float *values, int *exponents, float *output, int N)
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  int            i;
   __pp_vec_float x;      // base
   __pp_vec_int   y;      // exp
   __pp_vec_float result; // result
   __pp_vec_int   count;  // count
   __pp_vec_float temp;   // temp
   __pp_vec_int   quotient, product, remainder;
-  __pp_vec_int   zero = _pp_vset_int(0);
-  __pp_vec_int   two  = _pp_vset_int(2);
-  __pp_vec_float nine = _pp_vset_float(9.999999f);
+  __pp_vec_int   zero   = _pp_vset_int(0);
+  __pp_vec_float zero_f = _pp_vset_float(0.f);
+  __pp_vec_int   two    = _pp_vset_int(2);
+  __pp_vec_float nine   = _pp_vset_float(9.999999f);
   __pp_mask      maskAll, maskIsZero, maskIsNotZero, maskForWhile;
-  __pp_mask      maskIsOdd;
+  __pp_mask      maskIsOdd, mask9999, maskTemp;
 
   // All ones
   maskAll = _pp_init_ones();
 
   // All zeros
-  maskIsZero = _pp_init_ones(0);
+  maskForWhile = _pp_init_ones(0);
 
-  for (int i = 0; i < N; i += VECTOR_WIDTH)
+  for ( i = 0; i < N ; i += VECTOR_WIDTH)
   {
 
       // Load vector of values and vector of exponents from contiguous memory addresses
       _pp_vload_float(x, values + i, maskAll); // x = values[i];
-      _pp_vload_int(y, exponents + i, maskAll); // y = exponents[i];
-      
-      _pp_vset_float(result, 1.f, maskAll);
+      _pp_vload_int(y, exponents + i, maskAll); // y = exponents[i];       
 
-      _pp_veq_int(maskIsZero, y, zero, maskAll);
+      _pp_vset_float(result, 1.f, maskAll); 
 
-      maskIsNotZero = _pp_mask_not(maskIsZero);
-
-      _pp_vmove_int(count, y, maskIsNotZero); // count = y
+      _pp_vmove_int(count, y, maskAll); // count = y
 
       // Init maskForWhile
-      _pp_vgt_int(maskForWhile, count, zero, maskIsNotZero);
+      _pp_vgt_int(maskForWhile, count, zero, maskAll);
 
       while (_pp_cntbits(maskForWhile))
       {   
@@ -100,14 +98,23 @@ void clampedExpVector(float *values, int *exponents, float *output, int N)
       _pp_vgt_int(maskIsOdd, remainder, zero, maskAll);
       _pp_vdiv_float(result, result, x, maskIsOdd);
 
-      _pp_vgt_float(maskIsNotZero, result, nine, maskIsNotZero); // if (result > 9.999999f) {
+      _pp_vgt_float(mask9999, result, nine, maskAll); // if (result > 9.999999f) {
 
-      _pp_vset_float(result, 9.999999f, maskIsNotZero); //   result = 9.999999f;
+      _pp_vset_float(result, 9.999999f, mask9999); //   result = 9.999999f;
+
+      _pp_veq_int(maskTemp, y, zero, maskAll);
+
+      _pp_vset_float(result, 1.f, maskTemp); //   result = 1.f;
 
       // Write results back to memory
       _pp_vstore_float(output + i, result, maskAll);
 
   }
+
+  // Rest of the elements should be zero
+  // int rest = i + ( N % VECTOR_WIDTH );
+  _pp_vstore_float(output + N, zero_f, maskAll);
+
 }
 
 // returns the sum of all elements in values
