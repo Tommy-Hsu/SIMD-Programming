@@ -53,10 +53,13 @@ void clampedExpVector(float *values, int *exponents, float *output, int N)
   __pp_vec_int   y;      // exp
   __pp_vec_float result; // result
   __pp_vec_int   count;  // count
+  __pp_vec_float temp;   // temp
+  __pp_vec_int   quotient, product, remainder;
   __pp_vec_int   zero = _pp_vset_int(0);
-  __pp_vec_int   one  = _pp_vset_int(1);
+  __pp_vec_int   two  = _pp_vset_int(2);
   __pp_vec_float nine = _pp_vset_float(9.999999f);
   __pp_mask      maskAll, maskIsZero, maskIsNotZero, maskForWhile;
+  __pp_mask      maskIsOdd;
 
   // All ones
   maskAll = _pp_init_ones();
@@ -70,30 +73,32 @@ void clampedExpVector(float *values, int *exponents, float *output, int N)
       // Load vector of values and vector of exponents from contiguous memory addresses
       _pp_vload_float(x, values + i, maskAll); // x = values[i];
       _pp_vload_int(y, exponents + i, maskAll); // y = exponents[i];
+      
+      _pp_vset_float(result, 1.f, maskAll);
 
-      // Set mask according to predicate
-      _pp_veq_int(maskIsZero, y, zero, maskAll); // if (y == 0) {
+      _pp_veq_int(maskIsZero, y, zero, maskAll);
 
-      // Execute instruction using mask ("if" clause)
-      _pp_vset_float(result, 1.f, maskIsZero); //   output[i] = 1.f;
+      maskIsNotZero = _pp_mask_not(maskIsZero);
 
-      // Inverse maskIsNegative to generate "else" mask
-      maskIsNotZero = _pp_mask_not(maskIsZero); // } else {
-
-      // Execute instruction ("else" clause)
-      _pp_vmove_float(result, x, maskIsNotZero); //   result = x;
-
-      _pp_vsub_int(count, y, one, maskIsNotZero); // count = y - 1
+      _pp_vmove_int(count, y, maskIsNotZero); // count = y
 
       // Init maskForWhile
       _pp_vgt_int(maskForWhile, count, zero, maskIsNotZero);
 
       while (_pp_cntbits(maskForWhile))
-      {
-          _pp_vmult_float(result, result, x, maskForWhile); // result *= x;
-          _pp_vsub_int(count, count, one, maskForWhile); // count--;
+      {   
+          _pp_vmult_float(temp, x, x, maskAll); // result *= x*x;
+          _pp_vmult_float(result, result, temp, maskForWhile); // result *= x*x;
+          _pp_vsub_int(count, count, two, maskForWhile); // count -= 2;
           _pp_vgt_int(maskForWhile, count, zero, maskForWhile);
       }
+
+      // if y is odd, div result by x
+      _pp_vdiv_int(quotient, y, two, maskAll);
+      _pp_vmult_int(product, quotient, two, maskAll);
+      _pp_vsub_int(remainder, y, product, maskAll);
+      _pp_vgt_int(maskIsOdd, remainder, zero, maskAll);
+      _pp_vdiv_float(result, result, x, maskIsOdd);
 
       _pp_vgt_float(maskIsNotZero, result, nine, maskIsNotZero); // if (result > 9.999999f) {
 
@@ -114,14 +119,16 @@ float arraySumVector(float *values, int N)
   //
   // PP STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-
-  float sum = 0.f;
+  float sum_f[VECTOR_WIDTH] = {0.f};
+  __pp_vec_float sum;
   __pp_vec_float x;
   __pp_vec_float temp;
   __pp_mask      maskAll;
 
-      // All ones
+  // All ones
   maskAll = _pp_init_ones();
+
+  _pp_vset_float(sum, 0.f, maskAll);
 
   for (int i = 0; i < N; i += VECTOR_WIDTH)
   {
@@ -137,8 +144,10 @@ float arraySumVector(float *values, int N)
       }
       _pp_hadd_float(x, x); // result = (a+b+c+d) | (a+b+c+d) | (a+b+c+d) | (a+b+c+d)
 
-      sum += x.value[0];
+      _pp_vadd_float(sum, sum, x, maskAll); // sum += result;
   }
 
-  return sum;
+  _pp_vstore_float(sum_f, sum, maskAll);
+
+  return sum_f[0];
 }
